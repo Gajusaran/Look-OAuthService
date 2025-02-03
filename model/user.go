@@ -7,3 +7,12 @@ type AppUser struct {
 	Name        string             `json:"name"`
 	PhoneNumber string             `json:"phn"`
 }
+
+type UserOtp struct {
+	Otp         string `json:"otp"`
+	PhoneNumber string `json:"phn"`
+}
+
+type LoggedUser struct {
+	PhoneNumber string `json:"phn"`
+}

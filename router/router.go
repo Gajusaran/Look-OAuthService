@@ -1,12 +1,13 @@
 package router
 
 import (
+	"github.com/Gajusaran/Look-OAuthService/handler"
 	"github.com/gorilla/mux"
-	"github.com/nainanisumit/loginOAuth/handler"
 )
 
-func router() *mux.Router {
+func Router() *mux.Router {
 	router := mux.NewRouter()
-	router.HandleFunc("/register", handler.Register).Methods("GET")
+	router.HandleFunc("/register", handler.Register).Methods("POST")
+	router.HandleFunc("/verifyotp", handler.VerifyOTP).Methods("POST")
 	return router
 }

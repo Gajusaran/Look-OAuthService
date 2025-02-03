@@ -4,13 +4,14 @@ import (
 	"context"
 	"log"
 
-	"github.com/nainanisumit/loginOAuth/model"
+	"github.com/Gajusaran/Look-OAuthService/database"
+	"github.com/Gajusaran/Look-OAuthService/model"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func createUser(otpRequestBody model.AppUser) (primitive.ObjectID, error) {
+func CreateUser(otpRequestBody model.AppUser) (primitive.ObjectID, error) {
 
-	userCreated, err := collection.InsertOne(context.TODO(), otpRequestBody)
+	userCreated, err := database.Collecation.InsertOne(context.TODO(), otpRequestBody)
 
 	if err != nil {
 		log.Fatal(err)
