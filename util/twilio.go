@@ -12,7 +12,7 @@ import (
 	openapi "github.com/twilio/twilio-go/rest/api/v2010"
 )
 
-func SendOTP(phoneNumber string) {
+func SendOTP(phoneNumber string, otp string) {
 	accountSid := os.Getenv("TWILIO_ACCOUNT_SID")
 	authToken := os.Getenv("TWILIO_AUTH_TOKEN")
 	fromPhone := os.Getenv("TWILIO_PHONE_NUMBER")
@@ -22,7 +22,6 @@ func SendOTP(phoneNumber string) {
 		Password: authToken,
 	})
 
-	otp := GenerateOTP()
 	message := fmt.Sprintf("Your OTP is: %s", otp)
 
 	params := &openapi.CreateMessageParams{}

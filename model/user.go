@@ -4,8 +4,8 @@ import "go.mongodb.org/mongo-driver/bson/primitive"
 
 type AppUser struct {
 	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	Name        string             `json:"name"`
-	PhoneNumber string             `json:"phn"`
+	Name        string             `json:"name" bson:"name"`
+	PhoneNumber string             `json:"phn" bson:"phn"`
 }
 
 type UserOtp struct {
@@ -13,6 +13,11 @@ type UserOtp struct {
 	PhoneNumber string `json:"phn"`
 }
 
-type LoggedUser struct {
+type LoginRequest struct {
 	PhoneNumber string `json:"phn"`
+}
+
+type LoginResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
 }

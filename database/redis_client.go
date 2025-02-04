@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"log"
+	"os"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -12,8 +13,11 @@ var (
 )
 
 func init() {
+
+	redis_connecation_string := os.Getenv("REDIS_CONNECTION_STRING")
+
 	Rdb = redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
+		Addr: redis_connecation_string,
 		DB:   0, // total 16db is there we set each db for each usages
 	})
 
