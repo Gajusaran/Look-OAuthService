@@ -4,13 +4,15 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type UserCreatedSuccessResponse struct {
-	Success bool               `json:"success"`
-	Payload primitive.ObjectID `json:"data"`
-	Message string             `json:"message"`
+type SuccessResponse struct {
+	Success    bool   `json:"success"`
+	Payload    any    `json:"data"`
+	Message    string `json:"message"`
+	StatusCode int    `json:"status"`
 }
 
-type UserCreatedFailureResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
+type FailureResponse struct {
+	Success    bool   `json:"success"`
+	Message    string `json:"message"`
+	StatusCode int    `json:"status"`
 }

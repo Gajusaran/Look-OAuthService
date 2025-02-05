@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
@@ -11,100 +12,134 @@ import (
 )
 
 func Register(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	var otpRequestBody model.AppUser // need to change the name of there sturct variable in each funcation
-	// Will change in future
-	json.NewDecoder(r.Body).Decode(&otpRequestBody)
-	userID, err := util.CreateUser(otpRequestBody)
 
-	// Will discuss this
-	w.WriteHeader(http.StatusCreated)
+	w.Header().Set("Content-Type", "application/json")
+	var UserInfo model.AppUser
+
+	if err := json.NewDecoder(r.Body).Decode(&UserInfo); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(schema.FailureResponse{
+			Success:    false,
+			Message:    "Invalid request body",
+			StatusCode: http.StatusBadRequest,
+		})
+		return
+	}
+
+	userID, err := util.CreateUser(UserInfo)
 
 	if err != nil {
-		json.NewEncoder(w).Encode(schema.UserCreatedFailureResponse{Success: false, Message: err.Error()})
-	} else {
-		json.NewEncoder(w).Encode(schema.UserCreatedSuccessResponse{Success: true, Payload: userID, Message: "User created successfully"})
-		util.SendOTP(otpRequestBody.PhoneNumber, util.GenerateOTP())
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(schema.FailureResponse{
+			Success:    false,
+			Message:    err.Error(),
+			StatusCode: http.StatusInternalServerError,
+		})
+		return
 	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(schema.SuccessResponse{
+		Success:    true,
+		Payload:    userID,
+		Message:    "User created successfully",
+		StatusCode: http.StatusCreated,
+	})
+
+	go func() {
+		var otp string = util.GenerateOTP()
+		if err := util.SendOTP(UserInfo.PhoneNumber, otp); err != nil {
+			log.Printf("Error sending OTP: %v %+v", err, UserInfo)
+		} else {
+			util.StoreOTP(UserInfo.phoneNumber, otp)
+		}
+	}()
+
 }
 
 func VerifyOTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	var verifyOtpBody model.UserOtp
+	var authBody model.AuthInfo
 
-	if err := json.NewDecoder(r.Body).Decode(&verifyOtpBody); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&authBody); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
-	otpFromRedis, err := util.FetchOTP(verifyOtpBody.PhoneNumber) // will handle error here also
+
+	otpFromRedis, err := util.FetchOTP(authBody.PhoneNumber) 
 
 	if err != nil {
-		json.NewEncoder(w).Encode(schema.UserCreatedFailureResponse{
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(schema.FailureResponse{
 			Success: false,
-			Message: "Invalid otp please try again", // incase otp expire after time limit, this need to be modify
+			Message: err.Error(),
+			StatusCode: http.StatusInternalServerError,
 		})
 		return
 	}
 
-	if otpFromRedis != verifyOtpBody.Otp {
-		json.NewEncoder(w).Encode(schema.UserCreatedFailureResponse{
+	if otpFromRedis != authBody.Otp {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(schema.FailureResponse{
 			Success: false,
 			Message: "OTP does not match.",
+			StatusCode: http.StatusBadRequest,
 		})
 		return
 	}
+    
+	token,err:=util.GenerateToken(authBody.phoneNumber)
 
-	// JWT logic , generate jwt and send
-	accessToken, err := util.GenerateAccessToken(verifyOtpBody.PhoneNumber)
-	if err != nil {
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+	if err!=nil{
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(schema.FailureResponse{
+			Success: false,
+			Message: err.Error(),
+			StatusCode: http.StatusInternalServerError,
+		})
 		return
 	}
-
-	refreshToken, err := util.GenerateRefreshToken(verifyOtpBody.PhoneNumber)
-	if err != nil {
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
-		return
-	}
-
-	response := map[string]string{
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
-	}
-
-	// Success message with token
-	json.NewEncoder(w).Encode(schema.UserCreatedFailureResponse{ // need to make response struct so we will send all things in a type of response
+	
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(schema.SuccessResponse{ 
 		Success: true,
-		Message: "OTP matched successfully, user logged in.",
+		Payload: token,
+		Message: "User verified successfully",
+        StatusCode: http.StatusOK,
 	})
-	json.NewEncoder(w).Encode(response)
 }
 
 func ResendOTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	var verifyOtpBody model.UserOtp
+	var authBody model.UserOtp
 
-	if err := json.NewDecoder(r.Body).Decode(&verifyOtpBody); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&authBody); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
-	otpFromRedis, err := util.FetchOTP(verifyOtpBody.PhoneNumber)
+	otpFromRedis, err := util.FetchOTP(authBody.PhoneNumber)
 
 	if err != nil {
-		util.SendOTP(verifyOtpBody.PhoneNumber, util.GenerateOTP()) //if otp is not there redis or expired, will send new otp
-		//error handling for sendotp fun
+		go func() {
+			var otp string = util.GenerateOTP()
+			if err := util.SendOTP(authBody.PhoneNumber, otp); err != nil {
+				log.Printf("Error in resending OTP: %v %+v", err, authBody)
+			} else {
+				util.StoreOTP(authBody.phoneNumber, otp)
+			}
+		}()
 	} else {
-		//otp already exits
-		util.SendOTP(verifyOtpBody.PhoneNumber, otpFromRedis) //error handling
+		go func() {
+			if err := util.SendOTP(authBody.PhoneNumber, otpFromRedis); err != nil {
+				log.Printf("Error in resending OTP: %v %+v", err, authBody)
+			} else {
+				util.StoreOTP(authBody.phoneNumber, otpFromRedis)
+			}
+		}()
 	}
-
-	json.NewEncoder(w).Encode(schema.UserCreatedFailureResponse{
-		Success: true,
-		Message: "OTP sent again successfully.",
-	})
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -129,7 +164,14 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		Message: "Login request processed. Proceed with OTP verification.",
 	}
 	json.NewEncoder(w).Encode(response)
-	util.SendOTP(request.PhoneNumber, util.GenerateOTP())
+	go func() {
+		var otp string = util.GenerateOTP()
+		if err := util.SendOTP(request.PhoneNumber, otp); err != nil {
+			log.Printf("Error sending OTP: %v %+v", err, request)
+		} else {
+			util.StoreOTP(request.phoneNumber, otp)
+		}
+	}()
 }
 
 func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {

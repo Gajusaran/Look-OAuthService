@@ -11,10 +11,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const dbName = "User"
-const colName = "UserInfo"
+const mongoDatabaseName = "User"
+const collectionName = "UserInfo"
 
-var Collecation *mongo.Collection
+var Collection *mongo.Collection
 
 func init() {
 	fmt.Println("intlize")
@@ -22,17 +22,14 @@ func init() {
 	if err != nil {
 		log.Fatalf("Error loading .env file")
 	}
-
-	connecationString := os.Getenv("MONGODB_CONNECTION_STRING")
-
-	clientOptions := options.Client().ApplyURI(connecationString)
-
-	client, err := mongo.Connect(context.TODO(), clientOptions)
+	// Changing context from TODO to Background because
+	// database connection is top level operation in application
+	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(os.Getenv("MONGODB_CONNECTION_STRING")))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	Collecation = client.Database(dbName).Collection(colName)
+	Collection = client.Database(mongoDatabaseName).Collection(collectionName)
 
 	err = client.Ping(context.TODO(), nil)
 	if err != nil {

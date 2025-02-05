@@ -13,17 +13,17 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func CreateUser(otpRequestBody model.AppUser) (primitive.ObjectID, error) {
+func CreateUser(UserInfo model.AppUser) (primitive.ObjectID, error) {
 	//Prevents operations from hanging forever if an external system (like MongoDB) is slow or unresponsive. Helps control resource usage and improve system performance.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel() //Always call the cancel() function after the operation is complete to clean up resources:
-	userCreated, err := database.Collecation.InsertOne(ctx, otpRequestBody)
+	userCreated, err := database.Collection.InsertOne(ctx, UserInfo)
 
 	if err != nil {
 		log.Fatal(err)
 		return primitive.NilObjectID, err
 	}
-	// Will replace this from user payload
+
 	return userCreated.InsertedID.(primitive.ObjectID), nil
 }
 
@@ -34,9 +34,10 @@ func FindByPhoneNumber(phoneNumber string) (*model.AppUser, error) {
 	var user model.AppUser
 	filter := bson.M{"phn": phoneNumber}
 
-	err := database.Collecation.FindOne(ctx, filter).Decode(&user)
+	err := database.Collection.FindOne(ctx, filter).Decode(&user)
 	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) { // spcail way of handling error if is matched with mongoerr will use coustom error handling here
+		// special way of handling error if is matched with mongoerr will use custom error handling here
+		if errors.Is(err, mongo.ErrNoDocuments) { 
 			return nil, errors.New("user not found")
 		}
 		return nil, err

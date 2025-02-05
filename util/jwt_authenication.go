@@ -73,3 +73,22 @@ func ParseToken(tokenStr string) (*Claims, error) {
 
 	return nil, fmt.Errorf("invalid token")
 }
+
+func GenerateToken(phoneNumber string) (map[string]string, error) {
+	// JWT logic , generate jwt and send
+	accessToken, err := GenerateAccessToken(phoneNumber)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, err := GenerateRefreshToken(phoneNumber)
+	if err != nil {
+		return nil, err
+	}
+
+	response := map[string]string{
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+	}
+	return response, nil
+}

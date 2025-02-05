@@ -8,7 +8,7 @@ type AppUser struct {
 	PhoneNumber string             `json:"phn" bson:"phn"`
 }
 
-type UserOtp struct {
+type AuthInfo struct {
 	Otp         string `json:"otp"`
 	PhoneNumber string `json:"phn"`
 }
