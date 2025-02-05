@@ -2,7 +2,6 @@ package util
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"os"
 	"strconv"
@@ -28,7 +27,7 @@ func SendOTP(phoneNumber string, otp string) error {
 	params.SetBody(fmt.Sprintf("Your OTP is: %s", otp))
 
 	if _, err := client.Api.CreateMessage(params); err != nil {
-		return err.Errorf("Failed to send OTP: %v", err)
+		return err
 	}
 
 	return nil

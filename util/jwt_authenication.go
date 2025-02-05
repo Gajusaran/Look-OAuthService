@@ -25,7 +25,7 @@ func GenerateAccessToken(phonenumber string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	// Sign the token with the secret key
-	signedToken, err := token.SignedString(os.Getenv("JWT_SECRET_KEY"))
+	signedToken, err := token.SignedString([]byte(os.Getenv("JWT_SECRET_KEY")))
 	if err != nil {
 		return "", fmt.Errorf("could not create access token: %v", err)
 	}
@@ -45,7 +45,7 @@ func GenerateRefreshToken(phonenumber string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	// Sign the refresh token with the secret key
-	signedToken, err := token.SignedString(os.Getenv("JWT_SECRET_KEY"))
+	signedToken, err := token.SignedString([]byte(os.Getenv("JWT_SECRET_KEY")))
 	if err != nil {
 		return "", fmt.Errorf("could not create refresh token: %v", err)
 	}
@@ -59,7 +59,7 @@ func ParseToken(tokenStr string) (*Claims, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method")
 		}
-		return os.Getenv("JWT_SECRET_KEY"), nil
+		return []byte(os.Getenv("JWT_SECRET_KEY")), nil
 	})
 
 	if err != nil {

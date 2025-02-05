@@ -1,9 +1,5 @@
 package schema
 
-import (
-	"go.mongodb.org/mongo-driver/bson/primitive"
-)
-
 type SuccessResponse struct {
 	Success    bool   `json:"success"`
 	Payload    any    `json:"data"`
