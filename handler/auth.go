@@ -12,23 +12,6 @@ import (
 	"github.com/Gajusaran/Look-OAuthService/util"
 )
 
-type Response struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
-func GetHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	response := Response{
-		Success: true,
-		Message: "API is working!",
-	}
-
-	json.NewEncoder(w).Encode(response)
-}
-
 func Register(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
