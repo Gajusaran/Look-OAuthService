@@ -12,6 +12,23 @@ import (
 	"github.com/Gajusaran/Look-OAuthService/util"
 )
 
+type Response struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+func GetHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	response := Response{
+		Success: true,
+		Message: "API is working!",
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
 func Register(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
@@ -39,6 +56,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	if existUser, _ := util.FindByPhoneNumber(UserInfo.PhoneNumber); existUser != nil {
 		w.WriteHeader(http.StatusConflict)
+		fmt.Println("user already there")
 		json.NewEncoder(w).Encode(schema.FailureResponse{
 			Success:    false,
 			Message:    "User already exists",
@@ -61,27 +79,26 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	UserInfo.ID = userID
 
-	go func() {
-		var otp string = util.GenerateOTP()
-		if err := util.SendOTP(UserInfo.PhoneNumber, otp); err != nil {
-			log.Printf("Error sending OTP: %v %+v", err, UserInfo)
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(schema.FailureResponse{
-				Success:    false,
-				Message:    err.Error(),
-				StatusCode: http.StatusInternalServerError,
-			})
-		} else {
-			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(schema.SuccessResponse{
-				Success:    true,
-				Payload:    userID,
-				Message:    "User created successfully",
-				StatusCode: http.StatusCreated,
-			})
-			go util.StoreOTP(UserInfo.PhoneNumber, otp)
-		}
-	}()
+	var otp string = util.GenerateOTP()
+	if err := util.SendOTP(UserInfo.PhoneNumber, otp); err != nil {
+		log.Printf("Error sending OTP: %v %+v", err, UserInfo)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(schema.FailureResponse{
+			Success:    false,
+			Message:    err.Error(),
+			StatusCode: http.StatusInternalServerError,
+		})
+	} else {
+		fmt.Println(UserInfo, "hello ehsovjdjcwod")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(schema.SuccessResponse{
+			Success:    true,
+			Payload:    UserInfo,
+			Message:    "User created successfully",
+			StatusCode: http.StatusCreated,
+		})
+		go util.StoreOTP(UserInfo.PhoneNumber, otp)
+	}
 }
 
 func VerifyOTP(w http.ResponseWriter, r *http.Request) {
