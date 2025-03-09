@@ -1,0 +1,30 @@
+# Ignore binaries
+main
+*.exe
+*.out
+*.a
+*.o
+
+# Ignore vendor directory (if using Go modules)
+vendor/
+
+# Ignore Go test cache and logs
+*.test
+*.log
+*.tmp
+tmp/
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+
+# Ignore git
+.git
+.gitignore
+.env
+
+# Ignore Docker-related files
+Dockerfile
+docker-compose.yml
+dump.rdb

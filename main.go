@@ -4,10 +4,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/Gajusaran/Look-OAuthService/router"
+	"github.com/loginOAuth/router"
 )
-
-// entry point for project
 
 func main() {
 	r := router.Router()

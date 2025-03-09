@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/loginOAuth/logger"
+	"github.com/sirupsen/logrus"
 )
 
 type Claims struct {
@@ -13,7 +15,7 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func GenerateAccessToken(phonenumber string) (string, error) {
+func GenerateAccessToken(phonenumber string) string {
 	claims := &Claims{
 		PhoneNumber: phonenumber,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -27,13 +29,18 @@ func GenerateAccessToken(phonenumber string) (string, error) {
 	// Sign the token with the secret key
 	signedToken, err := token.SignedString([]byte(os.Getenv("JWT_SECRET_KEY")))
 	if err != nil {
-		return "", fmt.Errorf("could not create access token: %v", err)
+		logger.Logger.WithFields(logrus.Fields{
+			"phone": phonenumber,
+		}).Error("JWT Access token not generated for claims ", claims)
+	} else {
+		logger.Logger.WithFields(logrus.Fields{
+			"phone": phonenumber,
+		}).Info("JWT Access token generated for claims ", claims)
 	}
-
-	return signedToken, nil
+	return signedToken
 }
 
-func GenerateRefreshToken(phonenumber string) (string, error) {
+func GenerateRefreshToken(phonenumber string) string {
 	claims := &Claims{
 		PhoneNumber: phonenumber,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -47,10 +54,15 @@ func GenerateRefreshToken(phonenumber string) (string, error) {
 	// Sign the refresh token with the secret key
 	signedToken, err := token.SignedString([]byte(os.Getenv("JWT_SECRET_KEY")))
 	if err != nil {
-		return "", fmt.Errorf("could not create refresh token: %v", err)
+		logger.Logger.WithFields(logrus.Fields{
+			"phone": phonenumber,
+		}).Error("JWT Refresh token not generated for claims ", claims)
+	} else {
+		logger.Logger.WithFields(logrus.Fields{
+			"phone": phonenumber,
+		}).Info("JWT Refresh token generated for claims ", claims)
 	}
-
-	return signedToken, nil
+	return signedToken
 }
 
 func ParseToken(tokenStr string) (*Claims, error) {
@@ -74,21 +86,20 @@ func ParseToken(tokenStr string) (*Claims, error) {
 	return nil, fmt.Errorf("invalid token")
 }
 
-func GenerateToken(phoneNumber string) (map[string]string, error) {
+func GenerateToken(phoneNumber string) map[string]string {
 	// JWT logic , generate jwt and send
-	accessToken, err := GenerateAccessToken(phoneNumber)
-	if err != nil {
-		return nil, err
+	accessToken := GenerateAccessToken(phoneNumber)
+	if len(accessToken) == 0 {
+		return map[string]string{}
 	}
 
-	refreshToken, err := GenerateRefreshToken(phoneNumber)
-	if err != nil {
-		return nil, err
+	refreshToken := GenerateRefreshToken(phoneNumber)
+	if len(refreshToken) == 0 {
+		return map[string]string{}
 	}
 
-	response := map[string]string{
+	return map[string]string{
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
 	}
-	return response, nil
 }

@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/Gajusaran/Look-OAuthService/database"
-	"github.com/Gajusaran/Look-OAuthService/model"
+	"github.com/loginOAuth/database"
+	"github.com/loginOAuth/model"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -37,7 +37,7 @@ func FindByPhoneNumber(phoneNumber string) (*model.AppUser, error) {
 	err := database.Collection.FindOne(ctx, filter).Decode(&user)
 	if err != nil {
 		// special way of handling error if is matched with mongoerr will use custom error handling here
-		if errors.Is(err, mongo.ErrNoDocuments) { 
+		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, errors.New("user not found")
 		}
 		return nil, err

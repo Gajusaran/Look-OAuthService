@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/loginOAuth/logger"
+	"github.com/sirupsen/logrus"
 	"github.com/twilio/twilio-go"
 	openapi "github.com/twilio/twilio-go/rest/api/v2010"
 )
@@ -27,10 +29,18 @@ func SendOTP(phoneNumber string, otp string) error {
 	params.SetBody(fmt.Sprintf("Your OTP is: %s", otp))
 
 	if _, err := client.Api.CreateMessage(params); err != nil {
+		logger.Logger.WithFields(logrus.Fields{
+			"twilio.error": err.Error(),
+			"otp":          otp,
+		}).Error("Error sending otp to phone number, ", phoneNumber)
 		return err
+	}else{
+		logger.Logger.WithFields(logrus.Fields{
+			"otp": otp,
+		}).Info("Otp sent to phone number ",phoneNumber)
+		return nil
 	}
 
-	return nil
 }
 
 func GenerateOTP() string {

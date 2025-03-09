@@ -2,14 +2,13 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
-	"github.com/Gajusaran/Look-OAuthService/model"
-	"github.com/Gajusaran/Look-OAuthService/schema"
-	"github.com/Gajusaran/Look-OAuthService/util"
+	"github.com/loginOAuth/logger"
+	"github.com/loginOAuth/model"
+	"github.com/loginOAuth/util"
+	"github.com/sirupsen/logrus"
 )
 
 func Register(w http.ResponseWriter, r *http.Request) {
@@ -18,69 +17,57 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	var UserInfo model.AppUser
 
 	if err := json.NewDecoder(r.Body).Decode(&UserInfo); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(schema.FailureResponse{
-			Success:    false,
-			Message:    "Invalid request body",
-			StatusCode: http.StatusBadRequest,
-		})
+		util.GetfailureJsonResponse(w, http.StatusBadRequest)
+		logger.Logger.WithFields(logrus.Fields{
+			"body.request": r.Body,
+		}).Error("Invalid request body")
 		return
 	}
 
 	if _, err := util.FindByPhoneNumber(UserInfo.PhoneNumber); err != nil && err.Error() != "user not found" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(schema.FailureResponse{
-			Success:    false,
-			Message:    err.Error(),
-			StatusCode: http.StatusBadRequest,
-		})
+		util.GetfailureJsonResponse(w, http.StatusBadRequest)
+		logger.Logger.WithFields(logrus.Fields{
+			"mongo.error": err.Error(),
+		}).Error("Internal Server Error/Mongo Error")
 		return
 	}
 
 	if existUser, _ := util.FindByPhoneNumber(UserInfo.PhoneNumber); existUser != nil {
-		w.WriteHeader(http.StatusConflict)
-		fmt.Println("user already there")
-		json.NewEncoder(w).Encode(schema.FailureResponse{
-			Success:    false,
-			Message:    "User already exists",
-			StatusCode: http.StatusConflict,
-		})
+		util.GetfailureJsonResponse(w, http.StatusConflict)
+		logger.Logger.WithFields(logrus.Fields{
+			"mongo.error.conflict": "conflict",
+		}).Warn("User already exists with", existUser)
 		return
 	}
 
 	userID, err := util.CreateUser(UserInfo)
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(schema.FailureResponse{
-			Success:    false,
-			Message:    err.Error(),
-			StatusCode: http.StatusInternalServerError,
-		})
+		util.GetfailureJsonResponse(w, http.StatusInternalServerError)
+		logger.Logger.WithFields(logrus.Fields{
+			"mongo.error": err.Error(),
+		}).Error(err.Error())
 		return
 	}
 
 	UserInfo.ID = userID
-
 	var otp string = util.GenerateOTP()
+
+	if err := util.StoreOTP(UserInfo.PhoneNumber, otp); err != nil {
+		util.GetfailureJsonResponse(w, http.StatusInternalServerError)
+		return
+	}
+
 	if err := util.SendOTP(UserInfo.PhoneNumber, otp); err != nil {
-		log.Printf("Error sending OTP: %v %+v", err, UserInfo)
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(schema.FailureResponse{
-			Success:    false,
-			Message:    err.Error(),
-			StatusCode: http.StatusInternalServerError,
-		})
+		util.GetfailureJsonResponse(w, http.StatusInternalServerError)
 	} else {
-		fmt.Println(UserInfo, "hello ehsovjdjcwod")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(schema.SuccessResponse{
-			Success:    true,
-			Payload:    UserInfo,
-			Message:    "User created successfully",
-			StatusCode: http.StatusCreated,
-		})
-		go util.StoreOTP(UserInfo.PhoneNumber, otp)
+		util.GetSuccessJsonResponse(w, http.StatusCreated, UserInfo)
+		logger.Logger.WithFields(logrus.Fields{
+			"userID": UserInfo.ID,
+			"phone":  UserInfo.PhoneNumber,
+			"name":   UserInfo.Name,
+			"gender": UserInfo.UserGender,
+		}).Info("User registered successfully")
 	}
 }
 
@@ -90,56 +77,40 @@ func VerifyOTP(w http.ResponseWriter, r *http.Request) {
 	var authBody model.AuthInfo
 
 	if err := json.NewDecoder(r.Body).Decode(&authBody); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(schema.FailureResponse{
-			Success:    false,
-			Message:    "Invalid request body",
-			StatusCode: http.StatusBadRequest,
-		})
+		util.GetfailureJsonResponse(w, http.StatusBadRequest)
+		logger.Logger.WithFields(logrus.Fields{
+			"body.request": r.Body,
+		}).Error("Invalid request body")
 		return
 	}
 
-	otpFromRedis, err := util.FetchOTP(authBody.PhoneNumber)
+	otpFromRedis := util.FetchOTP(authBody.PhoneNumber)
 
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(schema.FailureResponse{
-			Success:    false,
-			Message:    err.Error(),
-			StatusCode: http.StatusInternalServerError,
-		})
+	if len(otpFromRedis) == 0 {
+		util.GetfailureJsonResponse(w, http.StatusInternalServerError)
 		return
 	}
 
 	if otpFromRedis != authBody.Otp {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(schema.FailureResponse{
-			Success:    false,
-			Message:    "OTP does not match.",
-			StatusCode: http.StatusUnauthorized,
-		})
+		logger.Logger.WithFields(logrus.Fields{
+			"otp.redis":        otpFromRedis,
+			"request.body.otp": authBody.Otp,
+		}).Error("Otp does not match for phone number, ", authBody.PhoneNumber)
+		util.GetfailureJsonResponse(w, http.StatusUnauthorized)
 		return
 	}
 
-	token, err := util.GenerateToken(authBody.PhoneNumber)
+	token := util.GenerateToken(authBody.PhoneNumber)
 
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(schema.FailureResponse{
-			Success:    false,
-			Message:    err.Error(),
-			StatusCode: http.StatusInternalServerError,
-		})
+	if len(token) == 0 {
+		util.GetfailureJsonResponse(w, http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(schema.SuccessResponse{
-		Success:    true,
-		Payload:    token,
-		Message:    "User verified successfully",
-		StatusCode: http.StatusOK,
-	})
+	util.GetSuccessJsonResponse(w, http.StatusOK, token)
+	logger.Logger.WithFields(logrus.Fields{
+		"otp": otpFromRedis,
+	}).Info("Otp Verified for phone number ", authBody.PhoneNumber)
 }
 
 func ResendOTP(w http.ResponseWriter, r *http.Request) {
@@ -148,67 +119,75 @@ func ResendOTP(w http.ResponseWriter, r *http.Request) {
 	var authBody model.AuthInfo
 
 	if err := json.NewDecoder(r.Body).Decode(&authBody); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(schema.FailureResponse{
-			Success:    false,
-			Message:    "Invalid request body",
-			StatusCode: http.StatusBadRequest,
-		})
+		util.GetfailureJsonResponse(w, http.StatusBadRequest)
+		logger.Logger.WithFields(logrus.Fields{
+			"body.request": r.Body,
+		}).Error("Invalid request body")
 		return
 	}
 
-	otpFromRedis, err := util.FetchOTP(authBody.PhoneNumber)
+	otpFromRedis := util.FetchOTP(authBody.PhoneNumber)
 
-	if err != nil {
-		go func() {
-			var otp string = util.GenerateOTP()
-			if err := util.SendOTP(authBody.PhoneNumber, otp); err != nil {
-				log.Printf("Error in resending OTP: %v %+v", err, authBody)
-			} else {
-				util.StoreOTP(authBody.PhoneNumber, otp)
-			}
-		}()
+	if len(otpFromRedis) == 0 {
+		var otp string = util.GenerateOTP()
+		if err := util.StoreOTP(authBody.PhoneNumber, otp); err != nil {
+			util.GetfailureJsonResponse(w, http.StatusInternalServerError)
+			return
+		}
+		if err := util.SendOTP(authBody.PhoneNumber, otp); err != nil {
+			util.GetfailureJsonResponse(w, http.StatusInternalServerError)
+		}
 	} else {
-		go func() {
-			if err := util.SendOTP(authBody.PhoneNumber, otpFromRedis); err != nil {
-				log.Printf("Error in resending OTP: %v %+v", err, authBody)
-			} else {
-				util.StoreOTP(authBody.PhoneNumber, otpFromRedis)
-			}
-		}()
+		if err := util.SendOTP(authBody.PhoneNumber, otpFromRedis); err != nil {
+			util.GetfailureJsonResponse(w, http.StatusInternalServerError)
+		}
 	}
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
 	var request model.LoginRequest
-	err := json.NewDecoder(r.Body).Decode(&request)
-	if err != nil || strings.TrimSpace(request.PhoneNumber) == "" {
-		http.Error(w, "Invalid request: phone number required", http.StatusBadRequest)
-		return
-	}
-	// if user not exists will return for register
-	_, err = util.FindByPhoneNumber(request.PhoneNumber)
 
-	if err != nil {
-		http.Error(w, "User not found. Please register first.", http.StatusUnauthorized)
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		util.GetfailureJsonResponse(w, http.StatusBadRequest)
+		logger.Logger.WithFields(logrus.Fields{
+			"body.request": r.Body,
+		}).Error("Invalid request body")
 		return
 	}
 
-	response := model.LoginResponse{
-		Success: true,
-		Message: "Login request processed. Proceed with OTP verification.",
+	if _, err := util.FindByPhoneNumber(request.PhoneNumber); err != nil && err.Error() != "user not found" {
+		util.GetfailureJsonResponse(w, http.StatusBadRequest)
+		logger.Logger.WithFields(logrus.Fields{
+			"mongo.error": err.Error(),
+		}).Error("Internal Server Error/Mongo Error")
+		return
 	}
-	json.NewEncoder(w).Encode(response)
-	go func() {
-		var otp string = util.GenerateOTP()
-		if err := util.SendOTP(request.PhoneNumber, otp); err != nil {
-			log.Printf("Error sending OTP: %v %+v", err, request)
-		} else {
-			util.StoreOTP(request.PhoneNumber, otp)
-		}
-	}()
+
+	existUser, _ := util.FindByPhoneNumber(request.PhoneNumber)
+	if existUser == nil {
+		util.GetfailureJsonResponse(w, http.StatusUnauthorized)
+		logger.Logger.WithFields(logrus.Fields{
+			"mongo.error.unauthorised": "Unauthorised",
+		}).Warn("User not found with phone number ", request.PhoneNumber)
+		return
+	}
+
+	var otp string = util.GenerateOTP()
+
+	if err := util.StoreOTP(request.PhoneNumber, otp); err != nil {
+		util.GetfailureJsonResponse(w, http.StatusInternalServerError)
+		return
+	}
+
+	if err := util.SendOTP(request.PhoneNumber, otp); err != nil {
+		util.GetfailureJsonResponse(w, http.StatusInternalServerError)
+	} else {
+		util.GetSuccessJsonResponse(w, http.StatusOK, existUser)
+		logger.Logger.WithFields(logrus.Fields{
+			"phone": request.PhoneNumber,
+		}).Info("User Logged In successfully")
+	}
 }
 
 func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
@@ -217,8 +196,11 @@ func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	// Get the refresh token from the header with bearer
 	refreshToken := r.Header.Get("Authorization")
 
-	if refreshToken == "" {
-		http.Error(w, "Refresh token is missing", http.StatusBadRequest)
+	if len(refreshToken) == 0 {
+		util.GetfailureJsonResponse(w, http.StatusInternalServerError)
+		logger.Logger.WithFields(logrus.Fields{
+			"request.body": r.Body,
+		}).Error("Refresh Token is missing")
 		return
 	}
 
@@ -227,15 +209,15 @@ func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	refreshToken = refreshToken[1 : len(refreshToken)-1]
 	// validating the refresh token
 	claims, err := util.ParseToken(refreshToken)
-	fmt.Println(err)
+
 	if err != nil {
 		http.Error(w, "Invalid refresh token", http.StatusUnauthorized)
 		return
 	}
 
 	// Generate a new access token using the claims from the refresh token
-	accessToken, err := util.GenerateAccessToken(claims.PhoneNumber)
-	if err != nil {
+	accessToken := util.GenerateAccessToken(claims.PhoneNumber)
+	if len(accessToken) == 0 {
 		http.Error(w, "Failed to generate new access token", http.StatusInternalServerError)
 		return
 	}
