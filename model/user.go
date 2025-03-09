@@ -6,6 +6,7 @@ type AppUser struct {
 	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
 	Name        string             `json:"name" bson:"name"`
 	PhoneNumber string             `json:"phn" bson:"phn"`
+	UserGender  string             `json:"gender"`
 }
 
 type AuthInfo struct {
@@ -15,9 +16,4 @@ type AuthInfo struct {
 
 type LoginRequest struct {
 	PhoneNumber string `json:"phn"`
-}
-
-type LoginResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
 }

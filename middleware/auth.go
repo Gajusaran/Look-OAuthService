@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Gajusaran/Look-OAuthService/util"
+	"github.com/loginOAuth/util"
 )
 
 type ContextKey string
